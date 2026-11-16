@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Willy the Worm
+.DS_Store
+worlds/.legacy-migrated

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Willy the Worm</title>
+<style>
+  html,body{margin:0;height:100%;background:radial-gradient(ellipse at 50% 30%,#2a2745,#0e0d1a);color:#9b98c9;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  #c{width:min(100vw,calc((100vh - 150px)*960/576),960px);aspect-ratio:960/576;display:block;
+     border-radius:14px;box-shadow:0 0 0 3px #3a3763,0 14px 50px rgba(0,0,0,.6);touch-action:none}
+  #pad{display:none;gap:8px;width:min(100vw,960px);justify-content:space-between;padding:0 16px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+  #pad div{display:flex;gap:8px}
+  #pad button{font:bold 22px "Trebuchet MS",system-ui,sans-serif;width:64px;height:56px;border-radius:14px;border:2px solid #4a4777;
+     background:#25233f;color:#e4e2ff;touch-action:none}
+  #pad button:active{background:#3c3a66}
+  #hint{font-size:13px;letter-spacing:.4px;text-align:center;padding:0 16px}
+  #links{display:flex;gap:10px;align-items:center}
+  #links a,#links button{font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#ffd166;text-decoration:none;
+     background:#25233f;border:2px solid #4a4777;border-radius:10px;padding:7px 14px;cursor:pointer}
+  #links a:hover,#links button:hover{background:#35326a;border-color:#6a66b8}
+  @media (pointer:coarse){#pad{display:flex}#hint{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="pad">
+  <div><button data-k="l">&larr;</button><button data-k="r">&rarr;</button></div>
+  <div><button data-k="u">&uarr;</button><button data-k="d">&darr;</button><button data-k="j">JUMP</button></div>
+</div>
+<div id="links"><button id="bWorlds" type="button">Worlds</button><a href="editor.html" id="aEditor">&#9998; Level editor</a></div>
+<div id="hint">Arrows / WASD move &middot; Space jump &middot; L worlds &middot; E editor &middot; P pause &middot; R restart room (costs a life) &middot; N mute</div>
+<script src="levels.js"></script>
+<script src="sprites.js"></script>
+<script src="store.js"></script>
+<script src="game.js"></script>
+<script>document.getElementById("bWorlds").onclick = e => { WW.ui.openWorlds(); e.currentTarget.blur(); };</script>
+</body>
+</html>
