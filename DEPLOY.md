@@ -78,3 +78,30 @@ Change files, then `git add . && git commit -m "..." && git push`. Pages redeplo
 - **Page loads but nothing is styled / scripts missing:** make sure you pushed every file (`git status` should be clean), including `levels.js`, `sprites.js`, `store.js`, `game.js`, `editor.js`.
 - **A bundled world isn't in the Worlds menu:** open `worlds/index.json` in the repo and check it lists the world's id; run `python3 tools/make-manifest.py --check` to see why.
 - **Old version still showing:** hard refresh (Cmd+Shift+R), or wait out the ~10 minute cache.
+
+---
+
+## Vercel with shared, online worlds (Hobby plan)
+
+The same site can run on Vercel with a shared library: anyone can play every world, and anyone can publish
+their own. The `api/` folder holds the serverless functions; worlds are stored in Upstash Redis (free tier).
+No npm packages are needed.
+
+1. **Import the repo** in Vercel (Add New → Project → pick `willy-the-worm`). Framework preset: *Other*. No build command.
+2. **Add storage:** in the project, open **Storage** (or the Marketplace) → **Upstash → Redis** → create a free database
+   and connect it to the project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically
+   (`UPSTASH_REDIS_REST_URL` / `_TOKEN` also work).
+3. **Redeploy** so the functions see the new variables.
+4. Open the site, then `editor.html`. The top right should say **Saving to the online library**.
+
+If the variables are missing, `/api/worlds` answers 503 and the site quietly falls back to saving in the visitor's browser.
+
+**How ownership works.** The first save of a world returns a secret edit token that the server only stores as a hash.
+That browser keeps the token in localStorage and sends it on later saves and deletes. Other visitors can play the world
+and open it in the editor, but saving gives them their own copy. Clearing site data loses the token, so use **Export world**
+as a backup.
+
+**Limits built in:** 256 KB per world, 30 levels, 150 worlds in the library, 30 saves per hour per IP, writes only from the
+site's own origin. Edit the constants at the top of `api/_lib.js` to change them.
+**Removing a bad world:** delete its key (`willy:world:<id>`) and remove the id from the `willy:ids` set in the Upstash console.
+Vercel's Hobby plan is for personal, non-commercial use.

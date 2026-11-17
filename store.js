@@ -1,5 +1,7 @@
 // Where worlds live.
 //  - Run `python3 server.py` and each world is a JSON file in ./worlds (the real "database").
+//  - Deployed on Vercel with Upstash connected, worlds live in a shared online library (api/ folder).
+//    Anyone can play them; each world can only be changed by the browser that created it (a secret edit token).
 //  - Open the page any other way and worlds are saved in this browser (localStorage) instead.
 // Either way, Export/Import in the editor moves them around as plain .json files.
 (function () {
@@ -11,12 +13,19 @@
     if (mode) return mode;
     try {
       const r = await fetch('api/worlds', { cache: 'no-store' });
-      if (r.ok && (r.headers.get('content-type') || '').includes('json')) { await r.json(); return (mode = 'server'); }
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
+        const j = await r.json();
+        if (Array.isArray(j)) return (mode = 'server');
+        if (j && j.remote === true && Array.isArray(j.worlds)) return (mode = 'remote');
+      }
     } catch (e) {}
     return (mode = 'browser');
   }
   const lsRead = () => { try { return JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { return {}; } };
   const lsWrite = o => localStorage.setItem(LS, JSON.stringify(o));
+  const TOK = 'willy-tokens';           // edit tokens for worlds this browser published: { id: token }
+  const tokens = () => { try { return JSON.parse(localStorage.getItem(TOK) || '{}') || {}; } catch (e) { return {}; } };
+  const setToken = (id, t) => { try { const o = tokens(); if (t) o[id] = t; else delete o[id]; localStorage.setItem(TOK, JSON.stringify(o)); } catch (e) {} };
   const ok = w => !WW.level.validateWorld(w);
 
   // One-time: levels saved by the earlier single-level version become a world called "My levels".
@@ -58,6 +67,14 @@
       const r = await fetch('api/worlds', { cache: 'no-store' });
       return (await r.json()).filter(ok);
     }
+    if (mode === 'remote') {                                // shared online library
+      migrateBrowser();
+      const r = await fetch('api/worlds', { cache: 'no-store' });
+      const have = tokens(), online = ((await r.json()).worlds || []).filter(ok).map(w => ({ ...w, remote: true, mine: !!have[w.id] }));
+      online.sort((a, b) => (b.mine - a.mine) || (b.updated - a.updated));
+      const local = Object.values(lsRead()).filter(ok).map(w => ({ ...w, local: true }));   // saved in this browser before the library existed
+      return (await bundled()).concat(online, local);
+    }
     migrateBrowser();                                       // static hosting: bundled worlds + this browser's own
     const mine = Object.values(lsRead()).filter(ok).sort((a, b) => (b.updated || 0) - (a.updated || 0));
     return (await bundled()).concat(mine);
@@ -72,6 +89,16 @@
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'save failed (' + r.status + ')');
       return r.json();
     }
+    if (mode === 'remote') {
+      const t = tokens()[world.id];
+      const r = await fetch('api/worlds/' + encodeURIComponent(world.id), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: 'Bearer ' + t } : {}) }, body: JSON.stringify(world),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'save failed (' + r.status + ')');
+      if (j.token) { setToken(j.id, j.token); delete j.token; }
+      return j;
+    }
     const all = lsRead(); all[world.id] = { ...world, updated: Date.now() }; lsWrite(all);
     return all[world.id];
   }
@@ -79,6 +106,13 @@
     if (await detect() === 'server') {
       const r = await fetch('api/worlds/' + encodeURIComponent(id), { method: 'DELETE' });
       if (!r.ok) throw new Error('delete failed (' + r.status + ')');
+      return;
+    }
+    if (mode === 'remote') {
+      const t = tokens()[id];
+      const r = await fetch('api/worlds/' + encodeURIComponent(id), { method: 'DELETE', headers: t ? { Authorization: 'Bearer ' + t } : {} });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'delete failed (' + r.status + ')');
+      setToken(id, null);
       return;
     }
     const all = lsRead(); delete all[id]; lsWrite(all);
@@ -91,5 +125,6 @@
     return id;
   }
 
-  WW.store = { mode: detect, list, save, remove, slug, uniqueId };
+  const exportTokens = tokens;
+  WW.store = { mode: detect, list, save, remove, slug, uniqueId, tokens: exportTokens };
 })();

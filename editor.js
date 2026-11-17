@@ -209,7 +209,8 @@ function syncLevelControls() {
   $('rate').value = meta.rate; $('speed').value = meta.speed;
   $('rateOut').textContent = (+meta.rate).toFixed(1) + ' s'; $('speedOut').textContent = (+meta.speed).toFixed(1);
 }
-const ownIndex = () => savedWorlds.findIndex(w => w.id === world.id && !w.bundled);   // which saved world is open (-1 = none)
+const readOnly = w => !!(w.bundled || w.local || (w.remote && !w.mine));   // can't be overwritten from here: opening it gives you a copy
+const ownIndex = () => savedWorlds.findIndex(w => w.id === world.id && !readOnly(w));   // which saved world is open (-1 = none)
 function syncWorldControls() {
   $('wName').value = world.name; $('wAuthor').value = world.author; $('wDesc').value = world.description;
   $('bDelWorld').disabled = !world.id;
@@ -241,7 +242,7 @@ async function refreshWorlds() {
   const sel = $('worldSel'); sel.innerHTML = '';
   const add = (v, t) => sel.append(Object.assign(document.createElement('option'), { value: v, textContent: t }));
   add('', world && world.id ? '— choose a world —' : '(this world is not saved yet)');
-  savedWorlds.forEach((w, i) => add(String(i), w.name + (w.author ? '  ·  ' + w.author : '') + '  (' + w.levels.length + ')' + (w.bundled ? '  [bundled]' : '')));
+  savedWorlds.forEach((w, i) => add(String(i), w.name + (w.author ? '  ·  ' + w.author : '') + '  (' + w.levels.length + ')' + (w.bundled ? '  [bundled]' : w.local ? '  [this browser]' : w.remote ? (w.mine ? '  [yours]' : '  [online]') : '')));
   sel.value = world && world.id && ownIndex() >= 0 ? String(ownIndex()) : '';
 }
 function fillBuiltins() {
@@ -253,9 +254,10 @@ const okToLeave = () => !dirty || confirm('Discard your unsaved changes?');
 // ---------------------------------------------------------------- level operations
 function openSaved(w) {
   setWorld(w);
-  if (w.bundled) {            // ships with the site, so it can't be overwritten from here: you get your own copy
+  if (readOnly(w)) {          // not yours to overwrite, so you get your own copy
     world.id = null; syncWorldControls(); refreshWorlds();
-    status('“' + world.name + '” is a bundled world (read-only). Rename it if you like, then Save world to keep your own copy.');
+    status('“' + world.name + '” ' + (w.bundled ? 'is a bundled world' : w.local ? 'is only saved in this browser' : 'was published by someone else') +
+      ' (read-only here). Rename it if you like, then Save world to keep your own copy.');
   } else status('Opened “' + world.name + '”.');
   saveDraft();
 }
@@ -294,7 +296,7 @@ async function save(asCopy) {
     world.id = w.id; world.name = w.name; dirty = false; saveDraft(); syncWorldControls();
     await refreshWorlds();
     status('Saved “' + w.name + '” (' + w.levels.length + ' level' + (w.levels.length === 1 ? '' : 's') + ') ' +
-      ((await store.mode()) === 'server' ? '→ worlds/' + w.id + '.json' : 'in this browser'), 'ok');
+      ({ server: '→ worlds/' + w.id + '.json', remote: 'to the online library' }[await store.mode()] || 'in this browser'), 'ok');
   } catch (e) { status('Could not save: ' + e.message, 'err'); }
 }
 function download(name, text) {
@@ -357,7 +359,7 @@ function wire() {
     }
     e.target.value = '';
     await refreshWorlds();
-    if (lastId && okToLeave()) { setWorld(savedWorlds.find(w => w.id === lastId && !w.bundled)); await refreshWorlds(); saveDraft(); }
+    if (lastId && okToLeave()) { setWorld(savedWorlds.find(w => w.id === lastId && !readOnly(w))); await refreshWorlds(); saveDraft(); }
     const parts = [];
     if (nWorlds) parts.push(nWorlds + ' world' + (nWorlds === 1 ? '' : 's') + ' imported');
     if (nLevels) parts.push(nLevels + ' level' + (nLevels === 1 ? '' : 's') + ' added to this world (Save world to keep)');
@@ -390,7 +392,9 @@ const looseWorld = w => w && typeof w === 'object' && Array.isArray(w.levels) &&
   } else setWorld(L.blankWorld());
   const mode = await store.mode();
   $('mode').className = mode;
-  $('mode').innerHTML = mode === 'server' ? 'Saving to the <b>worlds/</b> folder' : 'Saving <b>in this browser</b><br>run <code>python3 server.py</code> to save as files';
+  $('mode').innerHTML = mode === 'server' ? 'Saving to the <b>worlds/</b> folder'
+    : mode === 'remote' ? 'Saving to the <b>online library</b><br>only this browser can edit what it publishes · use Export as a backup'
+    : 'Saving <b>in this browser</b><br>run <code>python3 server.py</code> to save as files';
   await refreshWorlds();
   if (q.get('world')) { const w = savedWorlds.find(x => x.id === q.get('world')); if (w) openSaved(w); }
   syncWorldControls();

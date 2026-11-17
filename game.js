@@ -478,7 +478,7 @@ function drawMenu() {
     }
   }
   txt('↑ ↓ choose world   ·   Enter play   ·   E editor   ·   Esc back', PW / 2, 506, { size: 16, align: 'center', color: '#c7c4ee', weight: 700 });
-  txt(WW.storeMode === 'server' ? 'Worlds are the files in the worlds/ folder' : 'Saved in this browser — run server.py to keep worlds as files', PW / 2, H * CELL + HUDH / 2, { size: 13, align: 'center', color: '#9b98c9', weight: 600 });
+  txt(WW.storeMode === 'server' ? 'Worlds are the files in the worlds/ folder' : WW.storeMode === 'remote' ? 'Worlds from the shared online library — build yours in the editor' : 'Saved in this browser — run server.py to keep worlds as files', PW / 2, H * CELL + HUDH / 2, { size: 13, align: 'center', color: '#9b98c9', weight: 600 });
 }
 function menuKey(e) {
   const en = menuEntries(), k = e.key, cur = en[menuSel];
